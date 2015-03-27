@@ -1,37 +1,22 @@
 #include <iostream>
-#include <cfloat>
-#include <cstring>
 #include <boost/format.hpp>
+#include <boost/program_options.hpp>
 #include <boost/gil/gil_all.hpp>
+#include <boost/gil/extension/io/png_io.hpp>
 #include <boost/gil/extension/io/jpeg_io.hpp>
+#include <boost/gil/extension/io/tiff_io.hpp>
 #include <boost/gil/extension/numeric/resample.hpp>
 #include <boost/gil/extension/numeric/sampler.hpp>
 
 using namespace std;
 using namespace boost;
 using namespace gil;
+namespace po = program_options;
 
 typedef unsigned char uchar;
-typedef array<uchar, 3> Pixel;
-typedef array<Pixel, 5> Feature;
+typedef std::array<uchar, 3> Pixel;
+typedef std::array<uchar, 15> Feature;
 typedef vector<Feature> FeaturePool;
-
-ostream& operator<< (ostream& out, const Pixel& p) {
-	out << "[" << (int)p[0] << ", " << (int)p[1] << ", " << (int)p[2] << "]";
-	return out;
-}
-
-ostream& operator<< (ostream& out, const Feature& f) {
-	out << "<" << f[0] << ", " << f[1] << ", " << f[2] << ", " << f[3] << ", " << f[4] << ">";
-	return out;
-}
-
-ostream& operator<< (ostream& out, const FeaturePool& p) {
-	for (const Feature& f : p) {
-		out << f << endl;
-	}
-	return out;
-}
 
 const size_t pixelSize = sizeof(Pixel);
 FeaturePool featurePool;
@@ -40,12 +25,51 @@ Pixel match(const Feature& f);
 float distance(const Feature& f1, const Feature& f2);
 
 int main(int argc, char* argv[]) {
+	string inFileName, outFileName;
+
+	po::options_description desc("Options");
+	desc.add_options()
+		("in,i", po::value<string>(&inFileName)->required(), "Input Image")
+		("out,o", po::value<string>(&outFileName)->required(), "Output Image")
+		("help,h", "Display this help info");
+
+	po::variables_map vm;
+	try{
+		po::store(po::parse_command_line(argc, argv, desc), vm);
+		if (vm.count("help")) {
+			cout << desc << endl;
+			return EXIT_SUCCESS;
+		}
+		po::notify(vm);
+	} catch(po::error& e) {
+		cerr << "Error: " << e.what() << endl << endl;
+		cout << desc << endl;
+		return EXIT_FAILURE;
+	}
+
 	rgb8_image_t in;
-	jpeg_read_image("in.jpg", in);
+	string inFileExt = inFileName.substr(inFileName.rfind('.') + 1);
+
+	if (inFileExt == "png") {
+		png_read_image(inFileName, in);
+	} else {
+		if (inFileExt == "jpg" || inFileExt == "jpeg") {
+			jpeg_read_image(inFileName, in);
+		} else {
+			if (inFileExt == "tif" || inFileExt == "tiff") {
+				tiff_read_image(inFileName, in);
+			} else {
+				cout << format("Unsupported format: %1%\nSupported formats: png, jpg, tif") % inFileExt << endl;
+				return EXIT_FAILURE;
+			}
+		}
+	}
 
 	const rgb8c_view_t inView = const_view(in);
 	const int inX = inView.width() - 1;
 	const int inY = inView.height() - 1;
+
+	cout << format("%1%: [%2% * %3%]") % inFileName % inView.width() % inView.height() << endl;
 
 	for (int y = 0; y <= inY; y++) {
 		for (int x = 0; x <= inX; x++) {
@@ -54,16 +78,17 @@ int main(int argc, char* argv[]) {
 			int right = (x == inX) ? 0 : x + 1;
 
 			Feature f;
-			memcpy(f[0].data(), &inView(left, top), pixelSize);
-			memcpy(f[1].data(), &inView(x, top), pixelSize);
-			memcpy(f[2].data(), &inView(right, top), pixelSize);
-			memcpy(f[3].data(), &inView(left, y), pixelSize);
-			memcpy(f[4].data(), &inView(x, y), pixelSize);
+			auto ptr = f.data();
+
+			memcpy(ptr, &inView(left, top), pixelSize);
+			memcpy(ptr += pixelSize, &inView(x, top), pixelSize);
+			memcpy(ptr += pixelSize, &inView(right, top), pixelSize);
+			memcpy(ptr += pixelSize, &inView(left, y), pixelSize);
+			memcpy(ptr += pixelSize, &inView(x, y), pixelSize);
+
 			featurePool.push_back(f);
 		}
 	}
-
-	cout << format("Read image complete, size: [%1% * %2%]") % inView.width() % inView.height() << endl;
 
 	rgb8_image_t out(40, 30);
 	rgb8_view_t outView = view(out);
@@ -79,18 +104,35 @@ int main(int argc, char* argv[]) {
 			int right = (x == outX) ? 0 : x + 1;
 
 			Feature f;
-			memcpy(f[0].data(), &outView(left, top), pixelSize);
-			memcpy(f[1].data(), &outView(x, top), pixelSize);
-			memcpy(f[2].data(), &outView(right, top), pixelSize);
-			memcpy(f[3].data(), &outView(left, y), pixelSize);
+			auto ptr = f.data();
+
+			memcpy(ptr, &outView(left, top), pixelSize);
+			memcpy(ptr += pixelSize, &outView(x, top), pixelSize);
+			memcpy(ptr += pixelSize, &outView(right, top), pixelSize);
+			memcpy(ptr += pixelSize, &outView(left, y), pixelSize);
 
 			Pixel p = match(f);
 			memcpy(&outView(x, y), &p, pixelSize);
 		}
 	}
 
-	jpeg_write_view("out.jpg", outView);
-	cout << format("Write image complete, size: [%1% * %2%]") % outView.width() % outView.height() << endl;
+	string outFileExt = outFileName.substr(outFileName.rfind('.') + 1);
+	if (outFileExt == "png") {
+		png_write_view(outFileName, outView);
+	} else {
+		if (outFileExt == "jpg" || outFileExt == "jpeg") {
+			jpeg_write_view(outFileName, outView);
+		} else {
+			if (outFileExt == "tif" || outFileExt == "tiff") {
+				tiff_write_view(outFileName, outView);
+			} else {
+				cout << format("Unsupported format: %1%\nSupported formats: png, jpg, tif\nFallback to png") % outFileExt << endl;
+				outFileName.replace(outFileName.rfind('.') + 1, outFileExt.length(), "png");
+				png_write_view(outFileName, outView);
+			}
+		}
+	}
+	cout << format("%1%: [%2% * %3%]") % outFileName % outView.width() % outView.height() << endl;
 
 	return EXIT_SUCCESS;
 }
@@ -103,7 +145,7 @@ Pixel match(const Feature& f) {
 		float d = distance(thisF, f);
 		if (d < minDistance) {
 			minDistance = d;
-			minPixel = thisF[4];
+			memcpy(minPixel.data(), &thisF[12], pixelSize);
 		}
 	}
 
@@ -111,16 +153,16 @@ Pixel match(const Feature& f) {
 }
 
 float distance(const Feature& f1, const Feature& f2) {
-	return(f1[0][0] - f2[0][0]) * (f1[0][0] - f2[0][0])
-		+ (f1[0][1] - f2[0][1]) * (f1[0][1] - f2[0][1])
-		+ (f1[0][2] - f2[0][2]) * (f1[0][2] - f2[0][2])
-		+ (f1[1][0] - f2[1][0]) * (f1[1][0] - f2[1][0])
-		+ (f1[1][1] - f2[1][1]) * (f1[1][1] - f2[1][1])
-		+ (f1[1][2] - f2[1][2]) * (f1[1][2] - f2[1][2])
-		+ (f1[2][0] - f2[2][0]) * (f1[2][0] - f2[2][0])
-		+ (f1[2][1] - f2[2][1]) * (f1[2][1] - f2[2][1])
-		+ (f1[2][2] - f2[2][2]) * (f1[2][2] - f2[2][2])
-		+ (f1[3][0] - f2[3][0]) * (f1[3][0] - f2[3][0])
-		+ (f1[3][1] - f2[3][1]) * (f1[3][1] - f2[3][1])
-		+ (f1[3][2] - f2[3][2]) * (f1[3][2] - f2[3][2]);
+	return(f1[0] - f2[0]) * (f1[0] - f2[0])
+		+ (f1[1] - f2[1]) * (f1[1] - f2[1])
+		+ (f1[2] - f2[2]) * (f1[2] - f2[2])
+		+ (f1[3] - f2[3]) * (f1[3] - f2[3])
+		+ (f1[4] - f2[4]) * (f1[4] - f2[4])
+		+ (f1[5] - f2[5]) * (f1[5] - f2[5])
+		+ (f1[6] - f2[6]) * (f1[6] - f2[6])
+		+ (f1[7] - f2[7]) * (f1[7] - f2[7])
+		+ (f1[8] - f2[8]) * (f1[8] - f2[8])
+		+ (f1[9] - f2[9]) * (f1[9] - f2[9])
+		+ (f1[10] - f2[10]) * (f1[10] - f2[10])
+		+ (f1[11] - f2[11]) * (f1[11] - f2[11]);
 }

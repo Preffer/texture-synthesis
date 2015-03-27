@@ -1,6 +1,6 @@
 CC			= g++
 CFLAGS		= -std=c++14 -Wall -march=native -O3 -DNDEBUG
-LINKFLAGS	= -ljpeg
+LINKFLAGS	= -lboost_program_options -lpng -ljpeg -ltiff
 SRCS		= main.cpp
 OBJS		= $(SRCS:.cpp=.o)
 PROG		= main
