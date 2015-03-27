@@ -1,4 +1,4 @@
-CC			= g++
+CC			= clang++
 CFLAGS		= -std=c++14 -Wall -march=native
 LINKFLAGS	= -ljpeg
 SRCS		= main.cpp
