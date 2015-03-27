@@ -26,12 +26,15 @@ float distance(const Feature& f1, const Feature& f2);
 
 int main(int argc, char* argv[]) {
 	string inFileName, outFileName;
+	int outWidth, outHeight;
 
 	po::options_description desc("Options");
 	desc.add_options()
 		("in,i", po::value<string>(&inFileName)->required(), "Input Image")
 		("out,o", po::value<string>(&outFileName)->required(), "Output Image")
-		("help,h", "Display this help info");
+		("width,w", po::value<int>(&outWidth)->required(), "Output Width")
+		("height,h", po::value<int>(&outHeight)->required(), "Output Height")
+		("help,H", "Display this help info");
 
 	po::variables_map vm;
 	try{
@@ -90,14 +93,16 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	rgb8_image_t out(40, 30);
+	rgb8_image_t out(outWidth, outHeight);
 	rgb8_view_t outView = view(out);
 	resize_view(inView, outView, bilinear_sampler());
 
 	const int outX = outView.width() - 1;
 	const int outY = outView.height() - 1;
 
+	#pragma omp parallel for
 	for (int y = 0; y <= outY; y++) {
+		cout << format("Processing %1% / %2%") % y % outY << endl;
 		for (int x = 0; x <= outX; x++) {
 			int top = y ? y-1 : outY;
 			int left = x ? x-1 : outX;
