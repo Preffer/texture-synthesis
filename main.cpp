@@ -100,7 +100,6 @@ int main(int argc, char* argv[]) {
 	const int outX = outView.width() - 1;
 	const int outY = outView.height() - 1;
 
-	#pragma omp parallel for
 	for (int y = 0; y <= outY; y++) {
 		cout << format("Processing %1% / %2%") % y % outY << endl;
 		for (int x = 0; x <= outX; x++) {
@@ -146,7 +145,9 @@ Pixel match(const Feature& f) {
 	float minDistance = FLT_MAX;;
 	Pixel minPixel;
 
-	for (const Feature& thisF : featurePool) {
+	#pragma omp parallel for
+	for (auto it = featurePool.begin(); it < featurePool.end(); it++) {
+		const Feature& thisF = *it;
 		float d = distance(thisF, f);
 		if (d < minDistance) {
 			minDistance = d;
