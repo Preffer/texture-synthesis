@@ -1,5 +1,4 @@
 #include <iostream>
-#include <cmath>
 #include <cfloat>
 #include <cstring>
 #include <boost/format.hpp>
@@ -16,11 +15,6 @@ typedef unsigned char uchar;
 typedef array<uchar, 3> Pixel;
 typedef array<Pixel, 5> Feature;
 typedef vector<Feature> FeaturePool;
-
-ostream& operator<< (ostream& out, const rgb8_pixel_t& p) {
-	out << "[" << (int)p[0] << ", " << (int)p[1] << ", " << (int)p[2] << "]";
-	return out;
-}
 
 ostream& operator<< (ostream& out, const Pixel& p) {
 	out << "[" << (int)p[0] << ", " << (int)p[1] << ", " << (int)p[2] << "]";
@@ -42,8 +36,8 @@ ostream& operator<< (ostream& out, const FeaturePool& p) {
 const size_t pixelSize = sizeof(Pixel);
 FeaturePool featurePool;
 
-Pixel match(Feature f);
-float distance(Feature f1, Feature f2);
+Pixel match(const Feature& f);
+float distance(const Feature& f1, const Feature& f2);
 
 int main(int argc, char* argv[]) {
 	rgb8_image_t in;
@@ -71,10 +65,10 @@ int main(int argc, char* argv[]) {
 
 	cout << format("Read image complete, size: [%1% * %2%]") % inView.width() % inView.height() << endl;
 
-	rgb8_image_t out(80, 60);
-	resize_view(const_view(in), view(out), bilinear_sampler());
-
+	rgb8_image_t out(40, 30);
 	rgb8_view_t outView = view(out);
+	resize_view(inView, outView, bilinear_sampler());
+
 	const int outX = outView.width() - 1;
 	const int outY = outView.height() - 1;
 
@@ -92,17 +86,16 @@ int main(int argc, char* argv[]) {
 
 			Pixel p = match(f);
 			memcpy(&outView(x, y), &p, pixelSize);
-			cout << format("(%1%, %2%)") % x % y << endl;
 		}
 	}
 
-	jpeg_write_view("out.jpg", const_view(out));
-	cout << "Write image complete" << endl;
+	jpeg_write_view("out.jpg", outView);
+	cout << format("Write image complete, size: [%1% * %2%]") % outView.width() % outView.height() << endl;
 
 	return EXIT_SUCCESS;
 }
 
-Pixel match(Feature f) {
+Pixel match(const Feature& f) {
 	float minDistance = FLT_MAX;;
 	Pixel minPixel;
 
@@ -113,18 +106,21 @@ Pixel match(Feature f) {
 			minPixel = thisF[4];
 		}
 	}
+
 	return minPixel;
 }
 
-float distance(Feature f1, Feature f2) {
-	float d = 0;
-	// id -> pixelID
-	// index -> channelIndex in that pixel
-	for (int id = 0; id < 4; id++) {
-		for (int index = 0; index < 3; index++) {
-			d += pow((f1[id][index]-f2[id][index]), 2);
-		}
-	}
-
-	return d;
+float distance(const Feature& f1, const Feature& f2) {
+	return(f1[0][0] - f2[0][0]) * (f1[0][0] - f2[0][0])
+		+ (f1[0][1] - f2[0][1]) * (f1[0][1] - f2[0][1])
+		+ (f1[0][2] - f2[0][2]) * (f1[0][2] - f2[0][2])
+		+ (f1[1][0] - f2[1][0]) * (f1[1][0] - f2[1][0])
+		+ (f1[1][1] - f2[1][1]) * (f1[1][1] - f2[1][1])
+		+ (f1[1][2] - f2[1][2]) * (f1[1][2] - f2[1][2])
+		+ (f1[2][0] - f2[2][0]) * (f1[2][0] - f2[2][0])
+		+ (f1[2][1] - f2[2][1]) * (f1[2][1] - f2[2][1])
+		+ (f1[2][2] - f2[2][2]) * (f1[2][2] - f2[2][2])
+		+ (f1[3][0] - f2[3][0]) * (f1[3][0] - f2[3][0])
+		+ (f1[3][1] - f2[3][1]) * (f1[3][1] - f2[3][1])
+		+ (f1[3][2] - f2[3][2]) * (f1[3][2] - f2[3][2]);
 }
