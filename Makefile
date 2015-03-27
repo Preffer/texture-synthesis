@@ -1,5 +1,5 @@
 CC			= clang++
-CFLAGS		= -std=c++14 -Wall -march=native
+CFLAGS		= -std=c++14 -Wall -march=native -O3
 LINKFLAGS	= -ljpeg
 SRCS		= main.cpp
 OBJS		= $(SRCS:.cpp=.o)
