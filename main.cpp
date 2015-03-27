@@ -1,8 +1,12 @@
 #include <iostream>
+#include <cmath>
+#include <cfloat>
 #include <cstring>
 #include <boost/format.hpp>
 #include <boost/gil/gil_all.hpp>
-#include <boost/gil/extension/io/jpeg_dynamic_io.hpp>
+#include <boost/gil/extension/io/jpeg_io.hpp>
+#include <boost/gil/extension/numeric/resample.hpp>
+#include <boost/gil/extension/numeric/sampler.hpp>
 
 using namespace std;
 using namespace boost;
@@ -36,33 +40,91 @@ ostream& operator<< (ostream& out, const FeaturePool& p) {
 }
 
 const size_t pixelSize = sizeof(Pixel);
+FeaturePool featurePool;
+
+Pixel match(Feature f);
+float distance(Feature f1, Feature f2);
 
 int main(int argc, char* argv[]) {
-	rgb8_image_t src;
-	jpeg_read_image("test.jpg", src);
+	rgb8_image_t in;
+	jpeg_read_image("in.jpg", in);
 
-	const rgb8c_view_t srcView = view(src);
-	const int srcX = srcView.width() - 1;
-	const int srcY = srcView.height() - 1;
+	const rgb8c_view_t inView = const_view(in);
+	const int inX = inView.width() - 1;
+	const int inY = inView.height() - 1;
 
-	FeaturePool featurePool;
-	for (int y = 0; y <= srcY; y++) {
-		for (int x = 0; x <= srcX; x++) {
-			int top = y ? y-1 : srcY;
-			int left = x ? x-1 : srcX;
-			int right = (x == srcX) ? 0 : x + 1;
+	for (int y = 0; y <= inY; y++) {
+		for (int x = 0; x <= inX; x++) {
+			int top = y ? y-1 : inY;
+			int left = x ? x-1 : inX;
+			int right = (x == inX) ? 0 : x + 1;
 
 			Feature f;
-			memcpy(f[0].data(), &srcView(left, top), pixelSize);
-			memcpy(f[1].data(), &srcView(x, top), pixelSize);
-			memcpy(f[2].data(), &srcView(right, top), pixelSize);
-			memcpy(f[3].data(), &srcView(left, y), pixelSize);
-			memcpy(f[4].data(), &srcView(x, y), pixelSize);
+			memcpy(f[0].data(), &inView(left, top), pixelSize);
+			memcpy(f[1].data(), &inView(x, top), pixelSize);
+			memcpy(f[2].data(), &inView(right, top), pixelSize);
+			memcpy(f[3].data(), &inView(left, y), pixelSize);
+			memcpy(f[4].data(), &inView(x, y), pixelSize);
 			featurePool.push_back(f);
 		}
 	}
 
-	cout << featurePool.size() << endl;
+	cout << format("Read image complete, size: [%1% * %2%]") % inView.width() % inView.height() << endl;
+
+	rgb8_image_t out(80, 60);
+	resize_view(const_view(in), view(out), bilinear_sampler());
+
+	rgb8_view_t outView = view(out);
+	const int outX = outView.width() - 1;
+	const int outY = outView.height() - 1;
+
+	for (int y = 0; y <= outY; y++) {
+		for (int x = 0; x <= outX; x++) {
+			int top = y ? y-1 : outY;
+			int left = x ? x-1 : outX;
+			int right = (x == outX) ? 0 : x + 1;
+
+			Feature f;
+			memcpy(f[0].data(), &outView(left, top), pixelSize);
+			memcpy(f[1].data(), &outView(x, top), pixelSize);
+			memcpy(f[2].data(), &outView(right, top), pixelSize);
+			memcpy(f[3].data(), &outView(left, y), pixelSize);
+
+			Pixel p = match(f);
+			memcpy(&outView(x, y), &p, pixelSize);
+			cout << format("(%1%, %2%)") % x % y << endl;
+		}
+	}
+
+	jpeg_write_view("out.jpg", const_view(out));
+	cout << "Write image complete" << endl;
 
 	return EXIT_SUCCESS;
+}
+
+Pixel match(Feature f) {
+	float minDistance = FLT_MAX;;
+	Pixel minPixel;
+
+	for (const Feature& thisF : featurePool) {
+		float d = distance(thisF, f);
+		if (d < minDistance) {
+			minDistance = d;
+			minPixel = thisF[4];
+		}
+	}
+	return minPixel;
+}
+
+float distance(Feature f1, Feature f2) {
+	float d = 0;
+	// id -> pixelID
+	// index -> channelIndex in that pixel
+	for (int id = 0; id < 4; id++) {
+		for (int index = 0; index < 3; index++) {
+			d += pow((f1[id][index]-f2[id][index]), 2);
+		}
+	}
+
+	return d;
 }
