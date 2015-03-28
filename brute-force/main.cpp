@@ -19,10 +19,11 @@ typedef std::array<uchar, 15> Feature;
 typedef vector<Feature> FeaturePool;
 
 const size_t pixelSize = sizeof(Pixel);
-FeaturePool featurePool;
 
 Pixel match(const Feature& f);
 float distance(const Feature& f1, const Feature& f2);
+
+FeaturePool featurePool;
 
 int main(int argc, char* argv[]) {
 	string inFileName, outFileName;
@@ -50,22 +51,29 @@ int main(int argc, char* argv[]) {
 		return EXIT_FAILURE;
 	}
 
+	map<string, int> formatMap;
+	formatMap["png"] = 1;
+	formatMap["jpg"] = 2;
+	formatMap["jpeg"] = 2;
+	formatMap["tif"] = 3;
+	formatMap["tiff"] = 3;
+
 	rgb8_image_t in;
 	string inFileExt = inFileName.substr(inFileName.rfind('.') + 1);
 
-	if (inFileExt == "png") {
-		png_read_image(inFileName, in);
-	} else {
-		if (inFileExt == "jpg" || inFileExt == "jpeg") {
+	switch (formatMap[inFileExt]) {
+		case 1:
+			png_read_image(inFileName, in);
+			break;
+		case 2:
 			jpeg_read_image(inFileName, in);
-		} else {
-			if (inFileExt == "tif" || inFileExt == "tiff") {
-				tiff_read_image(inFileName, in);
-			} else {
-				cout << format("Unsupported format: %1%\nSupported formats: png, jpg, tif") % inFileExt << endl;
-				return EXIT_FAILURE;
-			}
-		}
+			break;
+		case 3:
+			tiff_read_image(inFileName, in);
+			break;
+		default:
+			cout << format("Unsupported format: %1%\nSupported formats: png, jpg, tif") % inFileExt << endl;
+			return EXIT_FAILURE;
 	}
 
 	const rgb8c_view_t inView = const_view(in);
@@ -121,21 +129,23 @@ int main(int argc, char* argv[]) {
 	}
 
 	string outFileExt = outFileName.substr(outFileName.rfind('.') + 1);
-	if (outFileExt == "png") {
-		png_write_view(outFileName, outView);
-	} else {
-		if (outFileExt == "jpg" || outFileExt == "jpeg") {
+
+	switch (formatMap[outFileExt]) {
+		case 1:
+			png_write_view(outFileName, outView);
+			break;
+		case 2:
 			jpeg_write_view(outFileName, outView);
-		} else {
-			if (outFileExt == "tif" || outFileExt == "tiff") {
-				tiff_write_view(outFileName, outView);
-			} else {
-				cout << format("Unsupported format: %1%\nSupported formats: png, jpg, tif\nFallback to png") % outFileExt << endl;
-				outFileName.replace(outFileName.rfind('.') + 1, outFileExt.length(), "png");
-				png_write_view(outFileName, outView);
-			}
-		}
+			break;
+		case 3:
+			tiff_write_view(outFileName, outView);
+			break;
+		default:
+			cout << format("Unsupported format: %1%\nSupported formats: png, jpg, tif\nFallback to png") % outFileExt << endl;
+			outFileName.replace(outFileName.rfind('.') + 1, outFileExt.length(), "png");
+			png_write_view(outFileName, outView);
 	}
+
 	cout << format("%1%: [%2% * %3%]") % outFileName % outView.width() % outView.height() << endl;
 
 	return EXIT_SUCCESS;
