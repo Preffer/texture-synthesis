@@ -18,7 +18,7 @@ namespace po = program_options;
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
 
-const int boxSize = 9;
+const int boxSize = 19;
 const int boxBorder = boxSize / 2;
 const int pixelCount = (boxSize + 1) * (boxSize - 1) / 2;
 const int pixelSize = sizeof(rgb8_pixel_t);
@@ -89,13 +89,15 @@ int main(int argc, char* argv[]) {
 	int inY = inView.height() - 1;
 
 	for (int y = 0; y <= inY; y++) {
+		map<int, int> ypos;
+		for (int i = -boxBorder; i <= 0; i++) {
+			ypos[i] = overflow(y + i, inY);
+		}
+
 		for (int x = 0; x <= inX; x++) {
 			map<int, int> xpos;
-			map<int, int> ypos;
-
 			for (int i = -boxBorder; i <= boxBorder; i++) {
 				xpos[i] = overflow(x + i, inX);
-				ypos[i] = overflow(y + i, inY);
 			}
 
 			Feature f;
@@ -124,13 +126,14 @@ int main(int argc, char* argv[]) {
 
 	for (int y = 0; y <= outY; y++) {
 		cout << format("Processing %1% / %2%") % y % outY << endl;
+		map<int, int> ypos;
+		for (int i = -boxBorder; i <= 0; i++) {
+			ypos[i] = overflow(y + i, outY);
+		}
 		for (int x = 0; x <= outX; x++) {
 			map<int, int> xpos;
-			map<int, int> ypos;
-
 			for (int i = -boxBorder; i <= boxBorder; i++) {
 				xpos[i] = overflow(x + i, outX);
-				ypos[i] = overflow(y + i, outY);
 			}
 
 			Feature f;
@@ -180,7 +183,7 @@ int overflow(int value, int max) {
 	if (value < 0) {
 		return value + max;
 	}
-	if ( value > max) {
+	if (value > max) {
 		return value - max;
 	}
 	return value;
