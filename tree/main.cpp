@@ -18,10 +18,14 @@ namespace po = program_options;
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
 
+const int boxSize = 5;
+const int boxBorder = boxSize / 2;
+const int pixelCount = (boxSize + 1) * (boxSize - 1) / 2;
+const int pixelSize = sizeof(rgb8_pixel_t);
+
 typedef unsigned char uchar;
-typedef bg::model::point<uchar, 12, bg::cs::cartesian> Feature;
+typedef bg::model::point<uchar, pixelCount, bg::cs::cartesian> Feature;
 typedef pair<Feature, rgb8_pixel_t> NodeType;
-const size_t pixelSize = sizeof(rgb8_pixel_t);
 
 int main(int argc, char* argv[]) {
 	string inFileName, outFileName;
@@ -75,52 +79,50 @@ int main(int argc, char* argv[]) {
 	}
 
 	const rgb8c_view_t inView = const_view(in);
-	const int inX = inView.width() - 1;
-	const int inY = inView.height() - 1;
-
 	cout << format("%1%: [%2% * %3%]") % inFileName % inView.width() % inView.height() << endl;
 
 	bgi::rtree< NodeType, bgi::linear<16> > featureTree;
 
-	for (int y = 0; y <= inY; y++) {
-		for (int x = 0; x <= inX; x++) {
-			int top = y ? y-1 : inY;
-			int left = x ? x-1 : inX;
-			int right = (x == inX) ? 0 : x + 1;
-
+	for (int y = boxBorder; y < inView.height() - boxBorder; y++) {
+		for (int x = boxBorder; x < inView.width() - boxBorder; x++) {
 			Feature f;
-			auto ptr = &f;
+			rgb8_pixel_t* ptr = (rgb8_pixel_t*) &f;
 
-			memcpy(ptr, &inView(left, top), pixelSize);
-			memcpy(ptr += pixelSize, &inView(x, top), pixelSize);
-			memcpy(ptr += pixelSize, &inView(right, top), pixelSize);
-			memcpy(ptr += pixelSize, &inView(left, y), pixelSize);
+			for (int row = -boxBorder; row < 0; row++) {
+				for (int col = -boxBorder; col <= boxBorder; col++, ptr++) {
+					memcpy(ptr, &inView(x+col, y+row), pixelSize);
+				}
+			}
 
-			featureTree.insert(make_pair(f, inView(x, y)));
+			for (int col = -boxBorder; col < 0; col++, ptr++) {
+				memcpy(ptr, &inView(x+col, y), pixelSize);
+			}
+
+			featureTree.insert(NodeType(f, inView(x, y)));
 		}
 	}
+
+	cout << "Index Done" << endl;
 
 	rgb8_image_t out(outWidth, outHeight);
 	rgb8_view_t outView = view(out);
 	resize_view(inView, outView, bilinear_sampler());
 
-	const int outX = outView.width() - 1;
-	const int outY = outView.height() - 1;
-
-	for (int y = 0; y <= outY; y++) {
-		cout << format("Processing %1% / %2%") % y % outY << endl;
-		for (int x = 0; x <= outX; x++) {
-			int top = y ? y-1 : outY;
-			int left = x ? x-1 : outX;
-			int right = (x == outX) ? 0 : x + 1;
-
+	for (int y = boxBorder; y < outView.height() - boxBorder; y++) {
+		cout << format("Processing %1% / %2%") % y % (outView.height() - boxBorder) << endl;
+		for (int x = boxBorder; x < outView.width() - boxBorder; x++) {
 			Feature f;
-			auto ptr = &f;
+			rgb8_pixel_t* ptr = (rgb8_pixel_t*) &f;
 
-			memcpy(ptr, &outView(left, top), pixelSize);
-			memcpy(ptr += pixelSize, &outView(x, top), pixelSize);
-			memcpy(ptr += pixelSize, &outView(right, top), pixelSize);
-			memcpy(ptr += pixelSize, &outView(left, y), pixelSize);
+			for (int row = -boxBorder; row < 0; row++) {
+				for (int col = -boxBorder; col <= boxBorder; col++, ptr++) {
+					memcpy(ptr, &outView(x+col, y+row), pixelSize);
+				}
+			}
+
+			for (int col = -boxBorder; col < 0; col++, ptr++) {
+				memcpy(ptr, &outView(x+col, y), pixelSize);
+			}
 
 			vector<NodeType> found;
 			featureTree.query(bgi::nearest(f, 1), std::back_inserter(found));
