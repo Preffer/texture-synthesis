@@ -18,7 +18,7 @@ namespace po = program_options;
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
 
-const int boxSize = 5;
+const int boxSize = 9;
 const int boxBorder = boxSize / 2;
 const int pixelCount = (boxSize + 1) * (boxSize - 1) / 2;
 const int pixelSize = sizeof(rgb8_pixel_t);
@@ -26,6 +26,8 @@ const int pixelSize = sizeof(rgb8_pixel_t);
 typedef unsigned char uchar;
 typedef bg::model::point<uchar, pixelCount, bg::cs::cartesian> Feature;
 typedef pair<Feature, rgb8_pixel_t> NodeType;
+
+int overflow(int value, int max);
 
 int main(int argc, char* argv[]) {
 	string inFileName, outFileName;
@@ -83,45 +85,65 @@ int main(int argc, char* argv[]) {
 
 	bgi::rtree< NodeType, bgi::linear<16> > featureTree;
 
-	for (int y = boxBorder; y < inView.height() - boxBorder; y++) {
-		for (int x = boxBorder; x < inView.width() - boxBorder; x++) {
+	int inX = inView.width() - 1;
+	int inY = inView.height() - 1;
+
+	for (int y = 0; y <= inY; y++) {
+		for (int x = 0; x <= inX; x++) {
+			map<int, int> xpos;
+			map<int, int> ypos;
+
+			for (int i = -boxBorder; i <= boxBorder; i++) {
+				xpos[i] = overflow(x + i, inX);
+				ypos[i] = overflow(y + i, inY);
+			}
+
 			Feature f;
 			rgb8_pixel_t* ptr = (rgb8_pixel_t*) &f;
 
 			for (int row = -boxBorder; row < 0; row++) {
 				for (int col = -boxBorder; col <= boxBorder; col++, ptr++) {
-					memcpy(ptr, &inView(x+col, y+row), pixelSize);
+					memcpy(ptr, &inView(xpos[col], ypos[row]), pixelSize);
 				}
 			}
 
 			for (int col = -boxBorder; col < 0; col++, ptr++) {
-				memcpy(ptr, &inView(x+col, y), pixelSize);
+				memcpy(ptr, &inView(xpos[col], y), pixelSize);
 			}
 
 			featureTree.insert(NodeType(f, inView(x, y)));
 		}
 	}
 
-	cout << "Index Done" << endl;
-
 	rgb8_image_t out(outWidth, outHeight);
 	rgb8_view_t outView = view(out);
 	resize_view(inView, outView, bilinear_sampler());
 
-	for (int y = boxBorder; y < outView.height() - boxBorder; y++) {
-		cout << format("Processing %1% / %2%") % y % (outView.height() - boxBorder) << endl;
-		for (int x = boxBorder; x < outView.width() - boxBorder; x++) {
+	int outX = outView.width() - 1;
+	int outY = outView.height() - 1;
+
+	for (int y = 0; y <= outY; y++) {
+		cout << format("Processing %1% / %2%") % y % outY << endl;
+		for (int x = 0; x <= outX; x++) {
+			map<int, int> xpos;
+			map<int, int> ypos;
+
+			for (int i = -boxBorder; i <= boxBorder; i++) {
+				xpos[i] = overflow(x + i, outX);
+				ypos[i] = overflow(y + i, outY);
+			}
+
 			Feature f;
 			rgb8_pixel_t* ptr = (rgb8_pixel_t*) &f;
 
 			for (int row = -boxBorder; row < 0; row++) {
 				for (int col = -boxBorder; col <= boxBorder; col++, ptr++) {
-					memcpy(ptr, &outView(x+col, y+row), pixelSize);
+					memcpy(ptr, &outView(xpos[col], ypos[row]), pixelSize);
 				}
 			}
 
 			for (int col = -boxBorder; col < 0; col++, ptr++) {
-				memcpy(ptr, &outView(x+col, y), pixelSize);
+				memcpy(ptr, &outView(xpos[col], y), pixelSize);
 			}
 
 			vector<NodeType> found;
@@ -152,4 +174,14 @@ int main(int argc, char* argv[]) {
 	cout << format("%1%: [%2% * %3%]") % outFileName % outView.width() % outView.height() << endl;
 
 	return EXIT_SUCCESS;
+}
+
+int overflow(int value, int max) {
+	if (value < 0) {
+		return value + max;
+	}
+	if ( value > max) {
+		return value - max;
+	}
+	return value;
 }
