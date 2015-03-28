@@ -19,11 +19,9 @@ namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
 
 typedef unsigned char uchar;
-typedef std::array<uchar, 3> Pixel;
 typedef bg::model::point<uchar, 12, bg::cs::cartesian> Feature;
-typedef pair<Feature, Pixel> NodeType;
-
-const size_t pixelSize = sizeof(Pixel);
+typedef pair<Feature, rgb8_pixel_t> NodeType;
+const size_t pixelSize = sizeof(rgb8_pixel_t);
 
 int main(int argc, char* argv[]) {
 	string inFileName, outFileName;
@@ -98,10 +96,7 @@ int main(int argc, char* argv[]) {
 			memcpy(ptr += pixelSize, &inView(right, top), pixelSize);
 			memcpy(ptr += pixelSize, &inView(left, y), pixelSize);
 
-			Pixel p;
-			memcpy(p.data(), &inView(x, y), pixelSize);
-
-			featureTree.insert(make_pair(f, p));
+			featureTree.insert(make_pair(f, inView(x, y)));
 		}
 	}
 
@@ -127,10 +122,10 @@ int main(int argc, char* argv[]) {
 			memcpy(ptr += pixelSize, &inView(right, top), pixelSize);
 			memcpy(ptr += pixelSize, &inView(left, y), pixelSize);
 
-			vector<NodeType> result_n;
-			featureTree.query(bgi::nearest(f, 1), std::back_inserter(result_n));
+			vector<NodeType> found;
+			featureTree.query(bgi::nearest(f, 1), std::back_inserter(found));
 
-			memcpy(&outView(x, y), result_n[0].second.data(), pixelSize);
+			outView(x, y) = found.front().second;
 		}
 	}
 
