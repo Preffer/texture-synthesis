@@ -117,10 +117,10 @@ int main(int argc, char* argv[]) {
 			Feature f;
 			auto ptr = &f;
 
-			memcpy(ptr, &inView(left, top), pixelSize);
-			memcpy(ptr += pixelSize, &inView(x, top), pixelSize);
-			memcpy(ptr += pixelSize, &inView(right, top), pixelSize);
-			memcpy(ptr += pixelSize, &inView(left, y), pixelSize);
+			memcpy(ptr, &outView(left, top), pixelSize);
+			memcpy(ptr += pixelSize, &outView(x, top), pixelSize);
+			memcpy(ptr += pixelSize, &outView(right, top), pixelSize);
+			memcpy(ptr += pixelSize, &outView(left, y), pixelSize);
 
 			vector<NodeType> found;
 			featureTree.query(bgi::nearest(f, 1), std::back_inserter(found));
