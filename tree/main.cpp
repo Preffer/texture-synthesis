@@ -149,6 +149,9 @@ int main(int argc, char* argv[]) {
 				memcpy(ptr, &outView(xpos[col], y), pixelSize);
 			}
 
+			vector<NodeType> found;
+			featureTree.query(bgi::nearest(f, 1), std::back_inserter(found));
+
 			outView(x, y) = found.front().second;
 		}
 	}
