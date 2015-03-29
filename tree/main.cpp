@@ -24,10 +24,8 @@ const int pixelCount = (boxSize + 1) * (boxSize - 1) / 2;
 const int pixelSize = sizeof(rgb8_pixel_t);
 
 typedef unsigned char uchar;
-typedef std::array<uchar, pixelSize> Pixel;
 typedef bg::model::point<uchar, pixelCount, bg::cs::cartesian> Feature;
-typedef pair<Feature, Pixel> NodeType;
-
+typedef pair<Feature, rgb8_pixel_t> NodeType;
 
 int overflow(int value, int max);
 
@@ -115,10 +113,7 @@ int main(int argc, char* argv[]) {
 				memcpy(ptr, &inView(xpos[col], y), pixelSize);
 			}
 
-			Pixel p;
-			memcpy(p.data(), &inView(x, y), pixelSize);
-
-			featureTree.insert(NodeType(f, p));
+			featureTree.insert(NodeType(f, inView(x, y)));
 		}
 	}
 
@@ -154,10 +149,7 @@ int main(int argc, char* argv[]) {
 				memcpy(ptr, &outView(xpos[col], y), pixelSize);
 			}
 
-			vector<NodeType> found;
-			featureTree.query(bgi::nearest(f, 1), std::back_inserter(found));
-
-			memcpy(&outView(x, y), found.front().second.data(), pixelSize);
+			outView(x, y) = found.front().second;
 		}
 	}
 
