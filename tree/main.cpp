@@ -18,14 +18,16 @@ namespace po = program_options;
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
 
-const int boxSize = 19;
+const int boxSize = 5;
 const int boxBorder = boxSize / 2;
 const int pixelCount = (boxSize + 1) * (boxSize - 1) / 2;
 const int pixelSize = sizeof(rgb8_pixel_t);
 
 typedef unsigned char uchar;
+typedef std::array<uchar, pixelSize> Pixel;
 typedef bg::model::point<uchar, pixelCount, bg::cs::cartesian> Feature;
-typedef pair<Feature, rgb8_pixel_t> NodeType;
+typedef pair<Feature, Pixel> NodeType;
+
 
 int overflow(int value, int max);
 
@@ -113,7 +115,10 @@ int main(int argc, char* argv[]) {
 				memcpy(ptr, &inView(xpos[col], y), pixelSize);
 			}
 
-			featureTree.insert(NodeType(f, inView(x, y)));
+			Pixel p;
+			memcpy(p.data(), &inView(x, y), pixelSize);
+
+			featureTree.insert(NodeType(f, p));
 		}
 	}
 
@@ -152,7 +157,7 @@ int main(int argc, char* argv[]) {
 			vector<NodeType> found;
 			featureTree.query(bgi::nearest(f, 1), std::back_inserter(found));
 
-			outView(x, y) = found.front().second;
+			memcpy(&outView(x, y), found.front().second.data(), pixelSize);
 		}
 	}
 
