@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
 	const rgb8c_view_t inView = const_view(in);
 	cout << format("%1%: [%2% * %3%]") % inFileName % inView.width() % inView.height() << endl;
 
-	bgi::rtree< NodeType, bgi::linear<16> > featureTree;
+	vector<NodeType> featurePool;
 
 	int inX = inView.width() - 1;
 	int inY = inView.height() - 1;
@@ -113,9 +113,11 @@ int main(int argc, char* argv[]) {
 				memcpy(ptr, &inView(xpos[col], y), pixelSize);
 			}
 
-			featureTree.insert(NodeType(f, inView(x, y)));
+			featurePool.push_back(NodeType(f, inView(x, y)));
 		}
 	}
+
+	bgi::rtree< NodeType, bgi::linear<16> > featureTree(featurePool.begin(), featurePool.end());
 
 	rgb8_image_t out(outWidth, outHeight);
 	rgb8_view_t outView = view(out);
