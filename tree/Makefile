@@ -1,5 +1,5 @@
 CC			= g++
-CFLAGS		= -std=c++11 -Wall -march=native -O3 -DNDEBUG
+CFLAGS		= -std=c++11 -Wall -march=native -O3 -DNDEBUG -ftemplate-depth=2048
 LINKFLAGS	= -lboost_program_options -lpng -ljpeg -ltiff
 SRCS		= main.cpp
 OBJS		= $(SRCS:.cpp=.o)

@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	bgi::rtree< NodeType, bgi::linear<16> > featureTree(featurePool.begin(), featurePool.end());
+	bgi::rtree< NodeType, bgi::rstar<256> > featureTree(featurePool.begin(), featurePool.end());
 
 	rgb8_image_t out(outWidth, outHeight);
 	rgb8_view_t outView = view(out);
